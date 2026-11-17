@@ -10,9 +10,9 @@ evaluation on **unseen** attacks, MLflow experiment tracking and model registrat
 
 | | |
 |---|---|
-| **GitHub** | `https://github.com/<github-username>/awaazguard` |
-| **DagsHub (DVC remote + MLflow)** | `https://dagshub.com/<dagshub-username>/awaazguard` |
-| **MLflow UI** | `https://dagshub.com/<dagshub-username>/awaazguard.mlflow` |
+| **GitHub** | `https://github.com/SanniyaAslam/AwaazGuard` |
+| **DagsHub (DVC remote + MLflow)** | `https://dagshub.com/SanniyaAslam/AwaazGuard` |
+| **MLflow UI** | `https://dagshub.com/SanniyaAslam/AwaazGuard.mlflow` |
 | **Team** | Fatima Habib (23L-0881), Sanniya Aslam (23L-0672) |
 
 ---
@@ -77,8 +77,8 @@ so each result can be traced back to its exact code and data.
 NVIDIA GPU (recommended; a free Kaggle or Colab T4 works).
 
 ```bash
-git clone https://github.com/<github-username>/awaazguard.git
-cd awaazguard
+git clone https://github.com/SanniyaAslam/AwaazGuard.git
+cd AwaazGuard
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -131,7 +131,7 @@ Synthetic audio only checks that the plumbing works; its scores are meaningless.
 ## 6. Folder structure
 
 ```
-awaazguard/
+AwaazGuard/
 ├── data/                     # DVC-managed, git-ignored
 │   ├── raw/LA/               # ASVspoof 2019 LA (downloaded by `ingest`)
 │   ├── processed/            # versioned subset: audio/<split>/*.flac + metadata.csv
