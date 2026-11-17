@@ -1,0 +1,39 @@
+# ---- Data & models: versioned by DVC, never by Git ----
+/data/raw/
+/data/processed/
+/data/features/
+/models/
+*.flac
+*.wav
+*.zip
+*.npz
+*.npy
+*.pt
+*.pth
+*.pkl
+
+# ---- Secrets ----
+.env
+
+# ---- Local MLflow (only used for offline smoke tests) ----
+mlruns/
+mlartifacts/
+mlflow.db
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- OS / IDE ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ---- Mock data for smoke tests ----
+/mock_data/

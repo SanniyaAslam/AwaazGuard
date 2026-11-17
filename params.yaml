@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------
+# AwaazGuard - single source of truth for every pipeline stage.
+# Change a value here and `dvc repro` re-runs only affected stages.
+# ---------------------------------------------------------------
+seed: 42
+
+ingest:
+  # Official ASVspoof 2019 LA archive (Edinburgh DataShare, ~7.1 GB)
+  url: "https://datashare.ed.ac.uk/bitstream/handle/10283/3336/LA.zip?sequence=3&isAllowed=y"
+  zip_path: data/raw/LA.zip
+  extract_dir: data/raw            # archive extracts to data/raw/LA
+  # Optional: path to an already-extracted LA folder (skips download).
+  # Leave empty to download from `url`.
+  local_dir: ""
+  delete_zip_after_extract: false
+
+validate:
+  expected_sample_rate: 16000
+  min_duration_s: 0.5
+  max_duration_s: 15.0
+  audio_sample_per_split: 200      # files decoded per split for audio-level checks
+  max_silent_fraction: 0.02        # allowed fraction of near-silent files
+  max_clipped_fraction: 0.02       # allowed fraction of clipped files
+
+prepare:
+  # Reproducible subset (best accuracy is not the objective).
+  n_train: 2000
+  n_dev: 600
+  n_eval: 1950
+  bonafide_fraction: 0.3           # share of bona fide utterances per split
+
+features:                          # LFCC for the GMM baseline
+  n_fft: 512
+  win_length: 320                  # 20 ms @ 16 kHz
+  hop_length: 160                  # 10 ms
+  n_filters: 20
+  n_ceps: 20
+  use_deltas: true                 # 20 static + 20 delta + 20 delta-delta = 60 dims
+  pre_emphasis: 0.97
+
+baseline:                          # LFCC + GMM (official ASVspoof baseline family)
+  n_components: 64
+  covariance_type: diag
+  max_iter: 100
+  reg_covar: 0.0001
+  max_frames_per_class: 200000
+
+main:                              # AASIST-L (lightweight AASIST, ~85k params)
+  nb_samp: 64600                   # ~4 s of audio
+  epochs: 10
+  batch_size: 24
+  lr: 0.0001
+  weight_decay: 0.0001
+  class_weights: [0.1, 0.9]        # [spoof, bonafide] as in the AASIST paper
+  num_workers: 2
+  device: auto                     # auto | cpu | cuda
+  max_batches_per_epoch: 0         # 0 = full epoch (use small value for smoke tests)
+  model_config:
+    architecture: AASIST
+    nb_samp: 64600
+    first_conv: 128
+    filts: [70, [1, 32], [32, 32], [32, 24], [24, 24]]
+    gat_dims: [24, 32]
+    pool_ratios: [0.4, 0.5, 0.7, 0.5]
+    temperatures: [2.0, 2.0, 100.0, 100.0]
+
+register:
+  model_name: awaazguard-aasist
+  stage: Staging
+
+mlflow:
+  experiment_name: awaazguard-deliverable1

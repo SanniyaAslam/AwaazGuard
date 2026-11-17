@@ -1,0 +1,16 @@
+# Python 3.10 - 3.12 recommended
+numpy>=1.26,<3
+scipy>=1.11
+pandas>=2.1
+scikit-learn>=1.4
+soundfile>=0.12
+torch>=2.2
+pyyaml>=6.0
+tqdm>=4.66
+matplotlib>=3.8
+python-dotenv>=1.0
+# MLflow 2.x: DagsHub's hosted tracking server is MLflow-2 compatible
+mlflow>=2.16,<3
+sqlalchemy>=2.0.30,<2.1   # MLflow 2.x is not compatible with SQLAlchemy 2.1
+dvc[s3]>=3.50
+pytest>=8.0
