@@ -1,0 +1,125 @@
+stages:
+  ingest:
+    cmd: python -m src.stages.ingest
+    deps:
+      - src/stages/ingest.py
+    params:
+      - ingest
+    outs:
+      - data/raw/LA:
+          cache: false        # 7 GB public archive: re-downloadable, not pushed to remote
+          persist: true       # keep between runs so repro does not re-download
+      - reports/ingest.json:
+          cache: false
+
+  validate:
+    cmd: python -m src.stages.validate
+    deps:
+      - src/stages/validate.py
+      - data/raw/LA
+    params:
+      - seed
+      - validate
+    outs:
+      - reports/validation.json:
+          cache: false
+
+  prepare:
+    cmd: python -m src.stages.prepare
+    deps:
+      - src/stages/prepare.py
+      - data/raw/LA
+      - reports/validation.json
+    params:
+      - seed
+      - prepare
+    outs:
+      - data/processed        # versioned dataset subset -> pushed to DagsHub DVC remote
+      - reports/data_summary.json:
+          cache: false
+
+  featurize:
+    cmd: python -m src.stages.featurize
+    deps:
+      - src/stages/featurize.py
+      - src/features/lfcc.py
+      - data/processed
+    params:
+      - features
+    outs:
+      - data/features
+
+  train_baseline:
+    cmd: python -m src.stages.train_baseline
+    deps:
+      - src/stages/train_baseline.py
+      - src/models/gmm.py
+      - data/features
+    params:
+      - seed
+      - baseline
+    outs:
+      - models/baseline
+    metrics:
+      - reports/baseline_train.json:
+          cache: false
+
+  train_main:
+    cmd: python -m src.stages.train_main
+    deps:
+      - src/stages/train_main.py
+      - src/models/aasist.py
+      - data/processed
+    params:
+      - seed
+      - main
+    outs:
+      - models/main
+    metrics:
+      - reports/main_train.json:
+          cache: false
+    plots:
+      - reports/main_training_history.csv:
+          cache: false
+          x: epoch
+          y: dev_eer
+          title: AASIST-L dev EER per epoch
+
+  evaluate:
+    cmd: python -m src.stages.evaluate
+    deps:
+      - src/stages/evaluate.py
+      - src/utils/metrics.py
+      - data/processed
+      - data/features
+      - models/baseline
+      - models/main
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/per_attack_eer.csv:
+          cache: false
+          template: bar_horizontal
+          x: main_eer
+          y: attack_id
+          title: AASIST-L EER per unseen attack
+      - reports/roc.csv:
+          cache: false
+          x: fpr
+          y: tpr
+          title: ROC on eval (unseen attacks)
+      - reports/eval_overview.png:
+          cache: false
+
+  register:
+    cmd: python -m src.stages.register
+    deps:
+      - src/stages/register.py
+      - models/main
+      - reports/metrics.json
+    params:
+      - register
+    outs:
+      - reports/registry.json:
+          cache: false
