@@ -1,0 +1,302 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python -m src.stages.ingest
+    deps:
+    - path: src/stages/ingest.py
+      hash: md5
+      md5: 54f1e726d3ac05ac2ce1dbc77a3aa42d
+      size: 3583
+    params:
+      params.yaml:
+        ingest:
+          url: 
+            https://datashare.ed.ac.uk/bitstream/handle/10283/3336/LA.zip?sequence=3&isAllowed=y
+          zip_path: data/raw/LA.zip
+          extract_dir: data/raw
+          local_dir: ''
+          delete_zip_after_extract: false
+    outs:
+    - path: data/raw/LA
+      hash: md5
+      md5: aad8e136f192d083b8fc274b37cc0acf.dir
+      size: 7655650274
+      nfiles: 122318
+    - path: reports/ingest.json
+      hash: md5
+      md5: 8c28c73b5687ecb07a375ab6366c5c80
+      size: 188
+  validate:
+    cmd: python -m src.stages.validate
+    deps:
+    - path: data/raw/LA
+      hash: md5
+      md5: aad8e136f192d083b8fc274b37cc0acf.dir
+      size: 7655650274
+      nfiles: 122318
+    - path: src/stages/validate.py
+      hash: md5
+      md5: b6982a04377a12703b48e2d9df33c33e
+      size: 4822
+    params:
+      params.yaml:
+        seed: 42
+        validate:
+          expected_sample_rate: 16000
+          min_duration_s: 0.5
+          max_duration_s: 15.0
+          audio_sample_per_split: 200
+          max_silent_fraction: 0.02
+          max_clipped_fraction: 0.02
+    outs:
+    - path: reports/validation.json
+      hash: md5
+      md5: 74248c9c0f89d1b6ca9c114b84a63695
+      size: 2791
+  prepare:
+    cmd: python -m src.stages.prepare
+    deps:
+    - path: data/raw/LA
+      hash: md5
+      md5: aad8e136f192d083b8fc274b37cc0acf.dir
+      size: 7655650274
+      nfiles: 122318
+    - path: reports/validation.json
+      hash: md5
+      md5: 74248c9c0f89d1b6ca9c114b84a63695
+      size: 2791
+    - path: src/stages/prepare.py
+      hash: md5
+      md5: '63242546448759452574734830381560'
+      size: 3826
+    params:
+      params.yaml:
+        prepare:
+          n_train: 2000
+          n_dev: 600
+          n_eval: 1950
+          bonafide_fraction: 0.3
+        seed: 42
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 1498cd0732e612d7775d14e8b71f86d1.dir
+      size: 282478399
+      nfiles: 4551
+    - path: reports/data_summary.json
+      hash: md5
+      md5: cd7fd0a06e619597290a26e067c6478b
+      size: 807
+  featurize:
+    cmd: python -m src.stages.featurize
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 1498cd0732e612d7775d14e8b71f86d1.dir
+      size: 282478399
+      nfiles: 4551
+    - path: src/features/lfcc.py
+      hash: md5
+      md5: 2a5437898a019a6e02ba640fc3e13c2b
+      size: 2416
+    - path: src/stages/featurize.py
+      hash: md5
+      md5: fb9e2cd93191d41e24304f8a054e3196
+      size: 1454
+    params:
+      params.yaml:
+        features:
+          n_fft: 512
+          win_length: 320
+          hop_length: 160
+          n_filters: 20
+          n_ceps: 20
+          use_deltas: true
+          pre_emphasis: 0.97
+    outs:
+    - path: data/features
+      hash: md5
+      md5: 08721d50d48d267c079b912b5d9d5343.dir
+      size: 173511658
+      nfiles: 3
+  train_baseline:
+    cmd: python -m src.stages.train_baseline
+    deps:
+    - path: data/features
+      hash: md5
+      md5: 08721d50d48d267c079b912b5d9d5343.dir
+      size: 173511658
+      nfiles: 3
+    - path: src/models/gmm.py
+      hash: md5
+      md5: 3fa16bfdf464ada969e37eeb1edf996d
+      size: 1338
+    - path: src/stages/train_baseline.py
+      hash: md5
+      md5: 9015962b3c964965f3f123e0b79a2598
+      size: 3585
+    params:
+      params.yaml:
+        baseline:
+          n_components: 64
+          covariance_type: diag
+          max_iter: 100
+          reg_covar: 0.0001
+          max_frames_per_class: 200000
+        seed: 42
+    outs:
+    - path: models/baseline
+      hash: md5
+      md5: 3e7f4c594a6c34499fe4daa66306c43a.dir
+      size: 249900
+      nfiles: 2
+    - path: reports/baseline_train.json
+      hash: md5
+      md5: f7c9efad24fc13b3f3a3df52e846e93c
+      size: 148
+  train_main:
+    cmd: python -m src.stages.train_main
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 1498cd0732e612d7775d14e8b71f86d1.dir
+      size: 282478399
+      nfiles: 4551
+    - path: src/models/aasist.py
+      hash: md5
+      md5: 1d6d21a420d2b8186179f1a72414b550
+      size: 19167
+    - path: src/stages/train_main.py
+      hash: md5
+      md5: 2a89badc1cb1cc8540636649dd0f2c22
+      size: 7319
+    params:
+      params.yaml:
+        main:
+          nb_samp: 64600
+          epochs: 3
+          batch_size: 8
+          lr: 0.0001
+          weight_decay: 0.0001
+          class_weights:
+          - 0.1
+          - 0.9
+          num_workers: 2
+          device: auto
+          max_batches_per_epoch: 0
+          model_config:
+            architecture: AASIST
+            nb_samp: 64600
+            first_conv: 128
+            filts:
+            - 70
+            - - 1
+              - 32
+            - - 32
+              - 32
+            - - 32
+              - 24
+            - - 24
+              - 24
+            gat_dims:
+            - 24
+            - 32
+            pool_ratios:
+            - 0.4
+            - 0.5
+            - 0.7
+            - 0.5
+            temperatures:
+            - 2.0
+            - 2.0
+            - 100.0
+            - 100.0
+        seed: 42
+    outs:
+    - path: models/main
+      hash: md5
+      md5: b6d451ab59a1197ba7b8d4043e598c5b.dir
+      size: 419886
+      nfiles: 2
+    - path: reports/main_train.json
+      hash: md5
+      md5: dfdce0b6a7a2ec9548687ff02f5edf4f
+      size: 89
+    - path: reports/main_training_history.csv
+      hash: md5
+      md5: 2dc35fbe7f8ae94477a21dd9076879fa
+      size: 336
+  evaluate:
+    cmd: python -m src.stages.evaluate
+    deps:
+    - path: data/features
+      hash: md5
+      md5: 08721d50d48d267c079b912b5d9d5343.dir
+      size: 173511658
+      nfiles: 3
+    - path: data/processed
+      hash: md5
+      md5: 1498cd0732e612d7775d14e8b71f86d1.dir
+      size: 282478399
+      nfiles: 4551
+    - path: models/baseline
+      hash: md5
+      md5: 3e7f4c594a6c34499fe4daa66306c43a.dir
+      size: 249900
+      nfiles: 2
+    - path: models/main
+      hash: md5
+      md5: b6d451ab59a1197ba7b8d4043e598c5b.dir
+      size: 419886
+      nfiles: 2
+    - path: src/stages/evaluate.py
+      hash: md5
+      md5: b5cb62421ee53013cc492abd4c463c17
+      size: 5567
+    - path: src/utils/metrics.py
+      hash: md5
+      md5: e759d34dadb75898fa7eb915b1343425
+      size: 2572
+    outs:
+    - path: reports/eval_overview.png
+      hash: md5
+      md5: cf01075a92a1650cecfceeb733a61f59
+      size: 48923
+    - path: reports/metrics.json
+      hash: md5
+      md5: c4681f9c044831941c0a978847a7f262
+      size: 264
+    - path: reports/per_attack_eer.csv
+      hash: md5
+      md5: 639e9267e0df6e1a971f108183c4b1fc
+      size: 588
+    - path: reports/roc.csv
+      hash: md5
+      md5: ca5a88ac36325e2de04e09704c7642ac
+      size: 33406
+  register:
+    cmd: python -m src.stages.register
+    deps:
+    - path: models/main
+      hash: md5
+      md5: b6d451ab59a1197ba7b8d4043e598c5b.dir
+      size: 419886
+      nfiles: 2
+    - path: reports/metrics.json
+      hash: md5
+      md5: c4681f9c044831941c0a978847a7f262
+      size: 264
+    - path: src/stages/register.py
+      hash: md5
+      md5: c152bfdb62a9eb2dda86beae517bd329
+      size: 2192
+    params:
+      params.yaml:
+        register:
+          model_name: awaazguard-aasist
+          stage: Staging
+    outs:
+    - path: reports/registry.json
+      hash: md5
+      md5: a559638311ad346bc59c31e7ea8d9a8c
+      size: 168

@@ -1,0 +1,8 @@
+{
+  "source": "https://datashare.ed.ac.uk/bitstream/handle/10283/3336/LA.zip?sequence=3&isAllowed=y",
+  "flac_files": {
+    "train": 25380,
+    "dev": 24986,
+    "eval": 71933
+  }
+}
