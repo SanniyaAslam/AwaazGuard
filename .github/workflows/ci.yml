@@ -1,0 +1,120 @@
+name: CI
+
+# Runs on every pull request and every push to main.
+#   unit-tests      lint + all unit/API tests (incl. the data-validation and gate-logic tests)
+#   frontend        website build
+#   docker          image build
+#   data-validation schema, quality and leakage checks on the versioned dataset (data/processed)
+#   model-gate      champion (Production) vs challenger (Staging) on a FIXED test set;
+#                   fails (blocks merge and deployment) if the challenger is worse
+# CD (cd.yml) starts only after this whole workflow succeeds on main. To also stop the merge
+# button, turn these jobs into required checks (Settings -> Branches -> branch protection).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Lint + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1
+      - name: Install Python packages (CPU torch keeps the job fast)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt -r requirements-serve.txt onnx ruff
+      - name: Lint
+        run: ruff check src flows scripts tests --select E9,F63,F7,F82
+      - name: Unit + API + gate tests
+        run: pytest -q
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: frontend}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "20", cache: npm, cache-dependency-path: frontend/package-lock.json}
+      - run: npm ci
+      - run: npm run build
+
+  docker:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with: {context: ., file: docker/Dockerfile, push: false, cache-from: type=gha, cache-to: "type=gha,mode=max"}
+
+  data-validation:
+    name: Data validation (data/processed)
+    runs-on: ubuntu-latest
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail clearly if the DagsHub secrets are missing
+        run: |
+          [ -n "${{ secrets.DAGSHUB_TOKEN }}" ] || { echo "::error::Add the DAGSHUB_TOKEN, DAGSHUB_USERNAME and MLFLOW_TRACKING_URI repository secrets"; exit 1; }
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1
+      - run: pip install -r requirements-serve.txt "dvc[s3]>=3.50" tqdm
+      - name: Cache the DVC data (keyed on the dataset version in dvc.lock)
+        uses: actions/cache@v4
+        with:
+          path: .dvc/cache
+          key: dvc-data-${{ hashFiles('dvc.lock') }}
+      - name: Pull the versioned dataset from DagsHub
+        run: |
+          dvc remote modify origin --local access_key_id ${{ secrets.DAGSHUB_TOKEN }}
+          dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_TOKEN }}
+          dvc pull data/processed
+      - name: Validate the dataset (fails on corrupted, missing or leaky data)
+        run: python -m scripts.validate_processed
+
+  model-gate:
+    name: Model evaluation gate (challenger vs production)
+    needs: data-validation
+    runs-on: ubuntu-latest
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1
+      - run: pip install -r requirements-serve.txt "dvc[s3]>=3.50" tqdm
+      - uses: actions/cache@v4
+        with:
+          path: .dvc/cache
+          key: dvc-data-${{ hashFiles('dvc.lock') }}
+      - name: Pull the versioned dataset from DagsHub
+        run: |
+          dvc remote modify origin --local access_key_id ${{ secrets.DAGSHUB_TOKEN }}
+          dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_TOKEN }}
+          dvc pull data/processed
+      - name: Gate - Staging challenger must not be worse than Production on the fixed test set
+        run: python -m scripts.model_gate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: eval-gate-report, path: reports/eval_gate.json, if-no-files-found: ignore}
