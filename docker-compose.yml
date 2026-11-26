@@ -1,0 +1,64 @@
+# AwaazGuard stack: 3 containers, sized for a FREE 1 GB virtual machine (Azure for Students).
+#   Local (build the image yourself):  docker compose --env-file deploy.env up -d --build
+#   Server (pull the image from GHCR):  awaazguard-deploy            (see the handbook)
+# Settings come from deploy.env (copy deploy.env.example).
+
+services:
+  app:
+    image: ${IMAGE:-awaazguard}:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    command: ["uvicorn", "src.serving.gateway_app:app", "--host", "0.0.0.0", "--port", "8000"]  # 1 worker: canary state + metrics live in-process
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in deploy.env}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD}
+      MODEL_NAME: ${MODEL_NAME:-awaazguard-aasist}
+      MAX_AUDIO_S: ${MAX_AUDIO_S:-30}
+      MONITOR_IN_PROCESS: "1"
+      MONITOR_INTERVAL_MIN: ${MONITOR_INTERVAL_MIN:-15}
+      MONITOR_MIN_SAMPLES: ${MONITOR_MIN_SAMPLES:-50}
+      PUBLIC_GRAFANA_URL: ${PUBLIC_GRAFANA_URL:-}
+      ORT_THREADS: "2"
+    volumes: [appdata:/data]
+    ports: ["80:8000"]
+    mem_limit: 850m                     # + equal swap; drift checks run as a short subprocess
+    logging: &logs
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports: ["127.0.0.1:9090:9090"]      # not public; open with an SSH tunnel
+    mem_limit: 150m
+    logging: *logs
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in deploy.env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports: ["3001:3000"]
+    mem_limit: 200m
+    depends_on: [prometheus]
+    logging: *logs
+
+volumes:
+  appdata:
+  promdata:
+  grafanadata:

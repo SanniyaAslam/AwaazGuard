@@ -2,6 +2,8 @@
 /data/raw/
 /data/processed/
 /data/features/
+/data/feedback/
+/data/redteam/
 /models/
 *.flac
 *.wav
@@ -14,6 +16,8 @@
 
 # ---- Secrets ----
 .env
+deploy.env
+*.pem
 
 # ---- Local MLflow (only used for offline smoke tests) ----
 mlruns/
@@ -37,3 +41,11 @@ Thumbs.db
 
 # ---- Mock data for smoke tests ----
 /mock_data/
+
+# ---- Local serving / red-team artefacts ----
+*.onnx
+voices/
+audio_store/
+drift_reports/
+awaazguard_local.db
+.ruff_cache/

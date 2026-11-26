@@ -1,0 +1,16 @@
+.git
+.dvc/cache
+.venv
+data
+models
+mock_data
+voices
+mlruns
+mlflow.db
+**/__pycache__
+**/.pytest_cache
+frontend/node_modules
+frontend/.next
+.env
+deploy.env
+frontend/out
