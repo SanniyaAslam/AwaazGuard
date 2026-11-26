@@ -1,0 +1,18 @@
+# Runtime dependencies of the serving image (no torch: models are served with ONNX Runtime).
+# Optional extras: psycopg[binary] (PostgreSQL instead of SQLite), boto3 (S3 audio storage).
+numpy>=1.26,<3
+scipy>=1.11
+pandas>=2.1
+scikit-learn>=1.4
+soundfile>=0.12
+pyyaml>=6.0
+python-dotenv>=1.0
+onnxruntime>=1.18
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+httpx>=0.27
+sqlalchemy>=2.0.30,<2.1
+prometheus-client>=0.20
+mlflow-skinny>=2.16,<3
+evidently>=0.7,<0.8
