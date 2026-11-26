@@ -1,0 +1,5 @@
+# Extra packages for the automation flows (retrain / canary) and the red-team generators.
+# Install on the machine that runs them (Kaggle notebook or laptop):  pip install -r requirements-flows.txt
+prefect>=3.0,<4
+httpx>=0.27
+piper-tts>=1.3
