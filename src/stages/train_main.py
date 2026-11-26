@@ -19,6 +19,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
 from src.models.aasist import Model as AASIST
+from src.redteam import channel
 from src.utils.audio import load_audio, pad_or_crop
 from src.utils.common import (METADATA_CSV, MODELS_DIR, REPORTS_DIR, ROOT, get_logger,
                               load_params, save_json, set_seed)
@@ -32,10 +33,12 @@ OUT_DIR = MODELS_DIR / "main"
 class SpoofDataset(Dataset):
     """Label convention (AASIST): 1 = bona fide, 0 = spoof."""
 
-    def __init__(self, meta: pd.DataFrame, nb_samp: int, train: bool, seed: int):
+    def __init__(self, meta: pd.DataFrame, nb_samp: int, train: bool, seed: int,
+                 channel_aug_prob: float = 0.0):
         self.meta = meta.reset_index(drop=True)
         self.nb_samp, self.train = nb_samp, train
         self.rng = np.random.default_rng(seed)
+        self.channel_aug_prob = channel_aug_prob if train else 0.0
 
     def __len__(self) -> int:
         return len(self.meta)
@@ -43,6 +46,10 @@ class SpoofDataset(Dataset):
     def __getitem__(self, i: int):
         row = self.meta.iloc[i]
         wav, _ = load_audio(ROOT / row["path"])
+        if self.channel_aug_prob and self.rng.random() < self.channel_aug_prob:
+            # simulate phone line / WhatsApp Opus / MP3 / background noise (same as red-team)
+            kind = ("phone", "opus", "mp3", "noise")[int(self.rng.integers(4))]
+            wav = channel.apply(wav, kind, self.rng)
         x = pad_or_crop(wav, self.nb_samp, random_crop=self.train, rng=self.rng)
         return torch.from_numpy(x), int(row["label"] == "bonafide")
 
@@ -76,7 +83,8 @@ def main() -> None:
     meta = pd.read_csv(METADATA_CSV)
 
     g = torch.Generator().manual_seed(seed)
-    train_ds = SpoofDataset(meta[meta["split"] == "train"], mp["nb_samp"], True, seed)
+    train_ds = SpoofDataset(meta[meta["split"] == "train"], mp["nb_samp"], True, seed,
+                            channel_aug_prob=mp.get("channel_aug_prob", 0.0))
     dev_meta = meta[meta["split"] == "dev"].reset_index(drop=True)
     dev_ds = SpoofDataset(dev_meta, mp["nb_samp"], False, seed)
     train_dl = DataLoader(train_ds, batch_size=mp["batch_size"], shuffle=True,

@@ -34,7 +34,7 @@ def main() -> None:
     stage = rp["stage"]
     try:
         client.transition_model_version_stage(rp["model_name"], mv.version, stage=stage,
-                                              archive_existing_versions=False)
+                                              archive_existing_versions=True)
     except Exception as e:  # stage API removed on some servers -> alias still works
         log.warning("Stage transition not supported (%s); using alias only.", e)
     try:
