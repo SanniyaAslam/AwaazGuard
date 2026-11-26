@@ -1,0 +1,31 @@
+#cloud-config
+# Runs once on first boot: Docker, 2 GB swap (the VM has 1 GiB RAM), project files, deploy helper.
+package_update: true
+packages: [git, curl]
+
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G
+
+write_files:
+  - path: /usr/local/bin/awaazguard-deploy
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      # Usage: awaazguard-deploy [image-tag]   (default: latest)
+      set -euo pipefail
+      cd /opt/awaazguard
+      git pull --ff-only
+      export IMAGE_TAG="$${1:-latest}"
+      docker compose --env-file deploy.env pull
+      docker compose --env-file deploy.env up -d --remove-orphans
+      docker image prune -f
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - usermod -aG docker ${user}
+  - systemctl enable --now docker
+  - git clone ${repo_url} /opt/awaazguard || true
+  - chown -R ${user}:${user} /opt/awaazguard
+  - echo "AwaazGuard host ready" > /opt/awaazguard-ready
