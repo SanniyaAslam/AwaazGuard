@@ -29,6 +29,7 @@ stages:
     deps:
       - src/stages/prepare.py
       - data/raw/LA
+      - data/feedback
       - reports/validation.json
     params:
       - seed
@@ -85,6 +86,18 @@ stages:
           y: dev_eer
           title: AASIST-L dev EER per epoch
 
+  export_onnx:
+    cmd: python -m src.stages.export_onnx
+    deps:
+      - src/stages/export_onnx.py
+      - models/main
+      - data/processed
+    outs:
+      - models/serving          # model.onnx + reference.npz used by the serving stack
+    metrics:
+      - reports/export.json:
+          cache: false
+
   evaluate:
     cmd: python -m src.stages.evaluate
     deps:
@@ -117,6 +130,7 @@ stages:
     deps:
       - src/stages/register.py
       - models/main
+      - models/serving
       - reports/metrics.json
     params:
       - register

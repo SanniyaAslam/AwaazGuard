@@ -5,10 +5,13 @@
   subset contains all 13 unseen attacks (A07-A19) for per-attack EER.
 * Selected FLAC files are copied to data/processed/audio/<split>/ - this folder plus
   metadata.csv is the dataset version tracked by DVC and pushed to the DagsHub remote.
+* Labelled production feedback (data/feedback, exported by scripts/export_feedback.py and
+  versioned with `dvc add`) is appended to the TRAIN split - this closes the MLOps loop.
 """
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -16,7 +19,7 @@ import soundfile as sf
 from tqdm import tqdm
 
 from src.stages.validate import read_protocol
-from src.utils.common import (METADATA_CSV, PROCESSED_DIR, REPORTS_DIR, SPLITS, ROOT,
+from src.utils.common import (LABELS, METADATA_CSV, PROCESSED_DIR, REPORTS_DIR, SPLITS, ROOT,
                               audio_path, get_logger, load_params, save_json)
 
 log = get_logger("prepare")
@@ -37,6 +40,33 @@ def stratified_subset(df: pd.DataFrame, n_total: int, bona_frac: float,
         k = min(base + (1 if i < extra else 0), len(pool))
         parts.append(pool.sample(n=k, random_state=int(rng.integers(1 << 31))))
     return pd.concat(parts).sort_values("utt_id").reset_index(drop=True)
+
+
+def add_feedback(p: dict, rng: np.random.Generator) -> list[dict]:
+    """Append labelled production clips (data/feedback/labels.csv) to the train split."""
+    fb_dir = ROOT / p.get("feedback_dir", "data/feedback")
+    labels_csv = fb_dir / "labels.csv"
+    if not labels_csv.exists():
+        return []
+    fb = pd.read_csv(labels_csv)
+    fb = fb[fb["label"].isin(LABELS) & fb["file"].map(lambda f: (fb_dir / f).exists())]
+    if p.get("max_feedback") and len(fb) > p["max_feedback"]:
+        fb = fb.sample(n=p["max_feedback"], random_state=int(rng.integers(1 << 31)))
+    out_dir = PROCESSED_DIR / "audio" / "train"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for r in fb.itertuples():
+        dst = out_dir / f"FB_{r.prediction_id}{Path(r.file).suffix}"
+        shutil.copy2(fb_dir / r.file, dst)
+        info = sf.info(str(dst))
+        rows.append({
+            "utt_id": f"FB_{r.prediction_id}", "speaker_id": "FEEDBACK", "split": "train",
+            "attack_id": "-" if r.label == "bonafide" else "PROD", "label": r.label,
+            "path": dst.relative_to(ROOT).as_posix(),
+            "duration_s": round(info.frames / info.samplerate, 3),
+        })
+    log.info("Added %d feedback clips to train", len(rows))
+    return rows
 
 
 def main() -> None:
@@ -64,6 +94,7 @@ def main() -> None:
                 "duration_s": round(info.frames / info.samplerate, 3),
             })
 
+    rows += add_feedback(p, rng)
     meta = pd.DataFrame(rows)
     meta.to_csv(METADATA_CSV, index=False)
 
