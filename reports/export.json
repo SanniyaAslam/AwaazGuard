@@ -1,0 +1,7 @@
+{
+  "onnx_max_abs_diff": 4.76837158203125e-06,
+  "reference_size": 600,
+  "dev_eer_margin": 0.29365079365079366,
+  "threshold": 1.5305092334747314,
+  "onnx_mb": 0.738
+}

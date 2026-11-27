@@ -14,3 +14,5 @@ mlflow>=2.16,<3
 sqlalchemy>=2.0.30,<2.1   # MLflow 2.x is not compatible with SQLAlchemy 2.1
 dvc[s3]>=3.50
 pytest>=8.0
+onnx
+onnxruntime

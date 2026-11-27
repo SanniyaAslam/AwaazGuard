@@ -15,7 +15,7 @@ stages:
           zip_path: data/raw/LA.zip
           extract_dir: data/raw
           local_dir: ''
-          delete_zip_after_extract: false
+          delete_zip_after_extract: true
     outs:
     - path: data/raw/LA
       hash: md5
@@ -56,6 +56,11 @@ stages:
   prepare:
     cmd: python -m src.stages.prepare
     deps:
+    - path: data/feedback
+      hash: md5
+      md5: 5714f18fd9bbca949a715a2d107dd1fa.dir
+      size: 33
+      nfiles: 2
     - path: data/raw/LA
       hash: md5
       md5: aad8e136f192d083b8fc274b37cc0acf.dir
@@ -67,8 +72,8 @@ stages:
       size: 2791
     - path: src/stages/prepare.py
       hash: md5
-      md5: '63242546448759452574734830381560'
-      size: 3826
+      md5: d22ff9c1c65830a4b498b10d24fcea37
+      size: 5248
     params:
       params.yaml:
         prepare:
@@ -76,6 +81,8 @@ stages:
           n_dev: 600
           n_eval: 1950
           bonafide_fraction: 0.3
+          feedback_dir: data/feedback
+          max_feedback: 2000
         seed: 42
     outs:
     - path: data/processed
@@ -97,12 +104,12 @@ stages:
       nfiles: 4551
     - path: src/features/lfcc.py
       hash: md5
-      md5: 2a5437898a019a6e02ba640fc3e13c2b
-      size: 2416
+      md5: 32eda747610cab112d73272148060bc4
+      size: 2474
     - path: src/stages/featurize.py
       hash: md5
-      md5: fb9e2cd93191d41e24304f8a054e3196
-      size: 1454
+      md5: e13a87b64360a6c4b3735b8dd47171a9
+      size: 1498
     params:
       params.yaml:
         features:
@@ -129,12 +136,12 @@ stages:
       nfiles: 3
     - path: src/models/gmm.py
       hash: md5
-      md5: 3fa16bfdf464ada969e37eeb1edf996d
-      size: 1338
+      md5: 50dd29ebf4e8ced3ac11815b528ae3fe
+      size: 1367
     - path: src/stages/train_baseline.py
       hash: md5
-      md5: 9015962b3c964965f3f123e0b79a2598
-      size: 3585
+      md5: c1dfd7ab6983272878a8e7fbaba75990
+      size: 3668
     params:
       params.yaml:
         baseline:
@@ -147,12 +154,12 @@ stages:
     outs:
     - path: models/baseline
       hash: md5
-      md5: 3e7f4c594a6c34499fe4daa66306c43a.dir
+      md5: 74577a1e96fa01a1984ad9a0cdb2aa30.dir
       size: 249900
       nfiles: 2
     - path: reports/baseline_train.json
       hash: md5
-      md5: f7c9efad24fc13b3f3a3df52e846e93c
+      md5: 2d268e523e4c08c12de3cb042a87b32f
       size: 148
   train_main:
     cmd: python -m src.stages.train_main
@@ -164,12 +171,12 @@ stages:
       nfiles: 4551
     - path: src/models/aasist.py
       hash: md5
-      md5: 1d6d21a420d2b8186179f1a72414b550
-      size: 19167
+      md5: b0c572209ffa98bced8d39619201d16b
+      size: 19774
     - path: src/stages/train_main.py
       hash: md5
-      md5: 2a89badc1cb1cc8540636649dd0f2c22
-      size: 7319
+      md5: 395412fba9a42dab4b510ee38f9e24b1
+      size: 8027
     params:
       params.yaml:
         main:
@@ -181,6 +188,7 @@ stages:
           class_weights:
           - 0.1
           - 0.9
+          channel_aug_prob: 0.3
           num_workers: 2
           device: auto
           max_batches_per_epoch: 0
@@ -215,16 +223,16 @@ stages:
     outs:
     - path: models/main
       hash: md5
-      md5: b6d451ab59a1197ba7b8d4043e598c5b.dir
+      md5: 6b80360a3b8398b1b901f42ab66daaae.dir
       size: 419886
       nfiles: 2
     - path: reports/main_train.json
       hash: md5
-      md5: dfdce0b6a7a2ec9548687ff02f5edf4f
-      size: 89
+      md5: 8a6dd6f40e577af0b11b72f57da372d4
+      size: 88
     - path: reports/main_training_history.csv
       hash: md5
-      md5: 2dc35fbe7f8ae94477a21dd9076879fa
+      md5: 9aa3fa147e8eba8e4a7ac625743f60cc
       size: 336
   evaluate:
     cmd: python -m src.stages.evaluate
@@ -241,18 +249,18 @@ stages:
       nfiles: 4551
     - path: models/baseline
       hash: md5
-      md5: 3e7f4c594a6c34499fe4daa66306c43a.dir
+      md5: 74577a1e96fa01a1984ad9a0cdb2aa30.dir
       size: 249900
       nfiles: 2
     - path: models/main
       hash: md5
-      md5: b6d451ab59a1197ba7b8d4043e598c5b.dir
+      md5: 6b80360a3b8398b1b901f42ab66daaae.dir
       size: 419886
       nfiles: 2
     - path: src/stages/evaluate.py
       hash: md5
-      md5: b5cb62421ee53013cc492abd4c463c17
-      size: 5567
+      md5: 9f166f3e4fba340ca55dab8d2ddcca58
+      size: 5692
     - path: src/utils/metrics.py
       hash: md5
       md5: e759d34dadb75898fa7eb915b1343425
@@ -260,36 +268,41 @@ stages:
     outs:
     - path: reports/eval_overview.png
       hash: md5
-      md5: cf01075a92a1650cecfceeb733a61f59
-      size: 48923
+      md5: 7e55da71a40c46aa2909aa0a5df9a3ad
+      size: 49670
     - path: reports/metrics.json
       hash: md5
-      md5: c4681f9c044831941c0a978847a7f262
-      size: 264
+      md5: cd231c834c6425b5923c5cef74aee019
+      size: 265
     - path: reports/per_attack_eer.csv
       hash: md5
-      md5: 639e9267e0df6e1a971f108183c4b1fc
-      size: 588
+      md5: 2318ef0ea6652e510a5080940f71d7c8
+      size: 602
     - path: reports/roc.csv
       hash: md5
-      md5: ca5a88ac36325e2de04e09704c7642ac
-      size: 33406
+      md5: c0301ddfc7f946899c97384923cdde02
+      size: 34871
   register:
     cmd: python -m src.stages.register
     deps:
     - path: models/main
       hash: md5
-      md5: b6d451ab59a1197ba7b8d4043e598c5b.dir
+      md5: 6b80360a3b8398b1b901f42ab66daaae.dir
       size: 419886
+      nfiles: 2
+    - path: models/serving
+      hash: md5
+      md5: ab219e43d69b09cf816f61f8d72f79ef.dir
+      size: 1090996
       nfiles: 2
     - path: reports/metrics.json
       hash: md5
-      md5: c4681f9c044831941c0a978847a7f262
-      size: 264
+      md5: cd231c834c6425b5923c5cef74aee019
+      size: 265
     - path: src/stages/register.py
       hash: md5
-      md5: c152bfdb62a9eb2dda86beae517bd329
-      size: 2192
+      md5: 9fc0aa64041c5505376da1716d6bf1b5
+      size: 2242
     params:
       params.yaml:
         register:
@@ -298,5 +311,32 @@ stages:
     outs:
     - path: reports/registry.json
       hash: md5
-      md5: a559638311ad346bc59c31e7ea8d9a8c
+      md5: d77753b420f3183e81c3fd41cf23c5dc
       size: 168
+  export_onnx:
+    cmd: python -m src.stages.export_onnx
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 1498cd0732e612d7775d14e8b71f86d1.dir
+      size: 282478399
+      nfiles: 4551
+    - path: models/main
+      hash: md5
+      md5: 6b80360a3b8398b1b901f42ab66daaae.dir
+      size: 419886
+      nfiles: 2
+    - path: src/stages/export_onnx.py
+      hash: md5
+      md5: f560ba54e75c076771c4ad0941b524a8
+      size: 4183
+    outs:
+    - path: models/serving
+      hash: md5
+      md5: ab219e43d69b09cf816f61f8d72f79ef.dir
+      size: 1090996
+      nfiles: 2
+    - path: reports/export.json
+      hash: md5
+      md5: 56176feef169ae46b1f85ecb352abf9a
+      size: 174

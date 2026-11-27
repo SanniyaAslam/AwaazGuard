@@ -1,7 +1,7 @@
 {
   "model_name": "awaazguard-aasist",
-  "version": "1",
+  "version": "2",
   "stage": "Staging",
-  "run_id": "d02c17558b4f404ea09b8caa4e95d8eb",
-  "eval_eer": 0.20354090354090354
+  "run_id": "43e5fffe914048feb36012a111da75d2",
+  "eval_eer": 0.22246642246642245
 }
